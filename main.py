@@ -9,7 +9,7 @@ from tcapp import *
 
 
 def main():
-	tc = TCApp()
+	tc = TCApp(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 
 

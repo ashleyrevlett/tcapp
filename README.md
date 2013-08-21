@@ -1,4 +1,4 @@
-CellularTerrain
+TerraCell
 ================
 
 Pygame-based application that interactively generates terrain maps
