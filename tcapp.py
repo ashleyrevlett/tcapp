@@ -34,7 +34,8 @@ class TCApp:
 		self.tile_size = TILE_SIZE
 		self.map_width = map_width
 		self.map_height = map_height
-		self.base_font = pygame.font.SysFont("monospace", 12)
+		self.base_font = pygame.font.SysFont("helvetica", 8)
+		self.menu_font = pygame.font.SysFont("monospace", 14)
 
 		# init screen
 		self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))	
@@ -89,7 +90,7 @@ class TCApp:
 		# draw title screen		
 		text_surface = (SCREEN_WIDTH*.22) - 20
 		label_text = "ENTER: Evolve a new generation. ESCAPE: Reset to initial random state."
-		label = self.base_font.render(label_text, 1, WHITE)
+		label = self.menu_font.render(label_text, 1, WHITE)
 		label_rect = label.get_rect()
 		label_rect = label_rect.move(20,5)
 		self.screen.blit(label,label_rect)
@@ -112,12 +113,12 @@ class TCApp:
 					self.tiles[i][j] = 1
 				else:
 					self.tiles[i][j] = 0
-
+			
 		# now that random grid data is set up, draw the recs
-		self.draw_init_state()
+		self.draw_current_state()
 
 
-	def draw_init_state(self):
+	def draw_current_state(self):
 		# draw each tile and its label
 		offset_x = 10
 		offset_y = 30
@@ -125,6 +126,16 @@ class TCApp:
 			for j in xrange(0, self.rows, 1):
 				# draw rect outline
 				pygame.draw.rect(self.screen, (self.tiles[i][j]*255,self.tiles[i][j]*255,self.tiles[i][j]*255), ((i*self.tile_size)+offset_x, (j*self.tile_size)+offset_y, TILE_SIZE, TILE_SIZE), 0)									
+				pygame.draw.rect(self.screen, GRAY, ((i*self.tile_size)+offset_x, (j*self.tile_size)+offset_y, TILE_SIZE, TILE_SIZE), 1)									
+				# draw label
+				# draw title screen		
+				text_surface = TILE_SIZE			
+				label_text = str(i) + ', ' + str(j)
+				label = self.base_font.render(label_text, 1, PINK)
+				label_rect = pygame.Rect( (TILE_SIZE*i+offset_x,TILE_SIZE*j+offset_y), (TILE_SIZE+10,TILE_SIZE+10))
+				self.screen.blit(label,label_rect)
+
+
 		pygame.display.flip()
 
 
@@ -133,21 +144,21 @@ class TCApp:
 		for i in xrange(0, self.cols, 1):
 			for j in xrange(0, self.rows, 1):
 
-				if i == 0 or i == self.rows or j == 0 or j == self.cols: 
-					new_tiles[i][j] = 0
+				# if i == 0 or i == self.rows or j == 0 or j == self.cols: 
+				# 	new_tiles[i][j] = 0
+
+				state = self.tiles[i][j]
+				neighbors = self.get_neighbors(i, j)
+				
+				if state == 1 and sum(neighbors) >= 3:
+					new_tiles[i][j] = 1
+				elif state == 0 and sum(neighbors) >= 4:
+					new_tiles[i][j] = 1
 				else:
-					state = self.tiles[i][j]
-					neighbors = self.get_neighbors(i, j)
-					
-					if state == 1 and sum(neighbors) >= 3:
-						new_tiles[i][j] = 1
-					elif state == 0 and sum(neighbors) >= 4:
-						new_tiles[i][j] = 1
-					else:
-						new_tiles[i][j] = 0
+					new_tiles[i][j] = 0
 
 		self.tiles = new_tiles
-		self.draw_init_state()
+		self.draw_current_state()
 
 
 	def get_neighbors(self, tile_x, tile_y):
