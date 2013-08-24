@@ -46,7 +46,12 @@ class TCApp:
 		# draw initial grid
 		self.draw_grid()
 
-		#wait for events
+		# smooth it out a little
+		if SMOOTH_PASSES > 0:
+			for i in xrange(SMOOTH_PASSES):
+				self.evolve_state()
+
+		#wait for events in loop
 		self.loop()
 
 
@@ -93,6 +98,7 @@ class TCApp:
 	
 		
 	def draw_grid(self):
+
 		# init the grid
 		self.cols = int((self.map_width-20)/self.tile_size)
 		self.rows = int((self.map_height-40)/self.tile_size)
@@ -108,10 +114,10 @@ class TCApp:
 					self.tiles[i][j] = 0
 
 		# now that random grid data is set up, draw the recs
-		self.draw_state()
+		self.draw_init_state()
 
 
-	def draw_state(self):
+	def draw_init_state(self):
 		# draw each tile and its label
 		offset_x = 10
 		offset_y = 30
@@ -127,18 +133,21 @@ class TCApp:
 		for i in xrange(0, self.cols, 1):
 			for j in xrange(0, self.rows, 1):
 
-				state = self.tiles[i][j]
-				neighbors = self.get_neighbors(i, j)
-				
-				if state == 1 and sum(neighbors) >= 3:
-					new_tiles[i][j] = 1
-				elif state == 0 and sum(neighbors) >= 4:
-					new_tiles[i][j] = 1
-				else:
+				if i == 0 or i == self.rows or j == 0 or j == self.cols: 
 					new_tiles[i][j] = 0
+				else:
+					state = self.tiles[i][j]
+					neighbors = self.get_neighbors(i, j)
+					
+					if state == 1 and sum(neighbors) >= 3:
+						new_tiles[i][j] = 1
+					elif state == 0 and sum(neighbors) >= 4:
+						new_tiles[i][j] = 1
+					else:
+						new_tiles[i][j] = 0
 
 		self.tiles = new_tiles
-		self.draw_state()
+		self.draw_init_state()
 
 
 	def get_neighbors(self, tile_x, tile_y):
