@@ -7,15 +7,6 @@ from config import *
 Helper functions 
 """
 
-RED = (255,0,0)
-GREEN = (0,255,0)
-BLUE = (0,0,255)
-DARKBLUE = (0,0,128)
-WHITE = (255,255,255)
-BLACK = (0,0,0)
-GRAY = (100,100,100)
-PINK = (255,200,200)
-
 
 def random_color():
 	r = random.randrange(0, 255, 1)
