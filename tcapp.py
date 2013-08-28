@@ -8,8 +8,6 @@ tcapp.py
 		Pygame is required.
 		Currently working in coarse-grain resolution. 
 
-@todo	Add fractal layer of detail to current low-res map
-
 @license MIT License
 """
 
@@ -22,6 +20,7 @@ import sys
 from pygame.locals import *
 from config import *
 from helpers import *
+import colorsys
 
 
 class TCApp:
@@ -44,39 +43,16 @@ class TCApp:
 
 		# init screen
 		self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))	
-		pygame.display.set_caption("Press Enter to reset, Esc to quit")
+		pygame.display.set_caption("Enter: New | 1: Evolve (Mode) | 2: Evolve (Avg) | Esc: Exit")
 
-		self.draw_window()
+		self.create_window()
 
 		# init map
-		self.generate_map()
+		self.create_map()
 		
 		#wait for events in game loop
 		self.loop()
 
-
-
-	def reset_tile_size(self):
-		self.tile_size = TILE_SIZE
-
-
-	def generate_map(self):
-		self.draw_grid()
-
-		# smooth it out a little via mode
-		if SMOOTH_PASSES > 1:
-			for i in xrange(SMOOTH_PASSES):
-				self.evolve_state(evolve_mode=1)
-		else:
-			self.evolve_state(evolve_mode=1)
-		
-		self.evolve_state(evolve_mode=2)
-		self.evolve_state(evolve_mode=1)
-		
-		self.draw_grid_refined()
-				
-		self.evolve_state(evolve_mode=1)
-		self.evolve_state(evolve_mode=2)
 
 	def loop(self):
 		# infinite loop
@@ -87,17 +63,18 @@ class TCApp:
 
 			if event.type == pygame.QUIT:
 				running = 0
-			
-			if keys[pygame.K_RETURN]:
-				self.reset_tile_size()
-				self.generate_map()
-				time.sleep (50.0 / 1000.0)
-			
 			if keys[pygame.K_ESCAPE]:
-				sys.exit()	
+				running = 0
+			if keys[pygame.K_RETURN]:				
+				self.create_map()
+			if keys[pygame.K_1]:
+				self.evolve_state(evolve_mode='mode')					
+			if keys[pygame.K_2]:
+				self.evolve_state(evolve_mode='average')					
+	
 		
 
-	def draw_window(self):		
+	def create_window(self):		
 		""" draw black window to start """
 		bg = pygame.Surface(self.screen.get_size())
 		bg = bg.convert()
@@ -105,7 +82,24 @@ class TCApp:
 		self.screen.blit(bg, (0,0))
 		pygame.display.flip()
 	
+
+	def create_map(self):
+
+		self.reset_tile_size()
 		
+		self.draw_grid()
+
+		# magic formula
+		self.evolve_state(evolve_mode='mode')
+		self.evolve_state(evolve_mode='mode')					
+		self.evolve_state(evolve_mode='average')	
+			
+		self.draw_grid_refined()	
+
+		self.evolve_state(evolve_mode='mode')					
+		self.evolve_state(evolve_mode='average')	
+
+
 	def draw_grid(self):
 		""" initialize grid structure to random noise """
 		# init the grid
@@ -114,15 +108,47 @@ class TCApp:
 		self.tiles = [[0 for x in xrange(0, self.rows, 1)] for x in xrange(0, self.cols, 1)] 
 		for i in xrange(0, self.cols, 1):
 			for j in xrange(0, self.rows, 1):
-
-				#if on border of world, make water
-				if i == 0 or i == self.cols-1 or j == 0 or j == self.rows-1:
-					self.tiles[i][j] = 0				
-				else:
-					rnd_key = random.randint(0,MAX_HEIGHT)					
-					self.tiles[i][j] = rnd_key
+				rnd_key = random.randint(0,MAX_HEIGHT)					
+				self.tiles[i][j] = rnd_key
 
 		# now that random grid data is set up, draw the recs
+		self.draw_current_state()
+
+
+	def draw_grid_refined(self):
+		""" draw new grid in finer detail than parent """
+		# init the scaled grid
+		grid_scale = 4
+		tile_size_sm = self.tile_size/grid_scale
+		cols_sm = int(self.map_width/tile_size_sm)
+		rows_sm = int(self.map_height/tile_size_sm)
+		new_tiles = [[0 for x in xrange(0, rows_sm, 1)] for x in xrange(0, cols_sm, 1)] 
+	
+		# print "Cols: %d. Rows: %d. Tile Size: %d" % (self.cols, self.rows, self.tile_size)
+		# print "SmCols: %d. SmRows: %d. Sm Tile Size: %d" % (cols_sm, rows_sm, tile_size_sm)
+
+		for i in xrange(0, cols_sm, 1):
+			for j in xrange(0, rows_sm, 1):
+				#if on border of world, make water				
+				parent_tile_x = int(i/grid_scale)
+				parent_tile_y = int(j/grid_scale)					
+				neighbors = self.get_neighbor_tiles( (parent_tile_x, parent_tile_y) )
+				z_vals = []
+				for n in neighbors:
+					if ( 0 <= n[0] <= self.cols ) and ( 0 <= n[1] <= self.rows ):
+						z_vals.append( self.tiles[n[0]][n[1]] )
+			
+				# value of new small tile is avg of parents' neighbors +- random variance
+				rnd_val = random.randint( 0, int(MAX_HEIGHT*NOISE_SCALE) )														
+				avg_state = sum(z_vals)/len(z_vals)										
+				new_tiles[i][j] = clamp(avg_state+rnd_val, 0, MAX_HEIGHT)						
+							
+		# reset obj properties to reflect new grid size
+		self.cols = cols_sm
+		self.rows = rows_sm		
+		self.tile_size = tile_size_sm		
+		self.tiles = new_tiles
+
 		self.draw_current_state()
 
 
@@ -133,6 +159,8 @@ class TCApp:
 		for i in xrange(0, self.cols, 1):
 			for j in xrange(0, self.rows, 1):
 				color_val = self.calc_grayscale( self.tiles[i][j] )
+				# color_val = self.calc_hsb( self.tiles[i][j] )
+				# color_val = self.calc_color( self.tiles[i][j] )
 				pygame.draw.rect(self.screen, color_val, ((i*self.tile_size)+offset_x, (j*self.tile_size)+offset_y, self.tile_size, self.tile_size), 0)									
 				
 				if TESTING == True:
@@ -142,78 +170,32 @@ class TCApp:
 					label = self.base_font.render(label_text, 1, PINK)
 					label_rect = pygame.Rect( (self.tile_size*i+offset_x+1,self.tile_size*j+offset_y+1), (self.tile_size+10,self.tile_size+10))
 					self.screen.blit(label,label_rect)
-		
-		time.sleep (50.0 / 1000.0)
 
 		pygame.display.flip()
+		# time.sleep (1000.0 / 1000.0)		
 
 
-	def evolve_state(self, evolve_mode):
+	def evolve_state(self, evolve_mode='average'):
 		""" smooth map via averaging or mode 
-			1 is mode, 2 is average """
+			evolve_mode: string, 'mode' or 'average' """
 		new_tiles = [[0 for x in xrange(0, self.rows, 1)] for x in xrange(0, self.cols, 1)] 
-		for i in xrange(0, self.cols-1, 1):
-			for j in xrange(0, self.rows-1, 1):
-				# if on map border, make ocean
-				if i == 0 or i == self.cols or j == 0 or j == self.rows:
-					new_tiles[i][j] = 0
-				else:
-					state = self.tiles[i][j]
-					neighbors = self.get_neighbor_tiles( (i, j) )
-					z_vals = [self.tiles[n[0]][n[1]] for n in neighbors]
-					# rnd_var = random.randint(0, (MAX_HEIGHT*NOISE_SCALE) )												
-					rnd_var = 0
-					if evolve_mode == 1:								
-						mode_state = mode(z_vals)
-						new_tiles[i][j] = mode_state + rnd_var
-					else:
-						avg_state = sum(z_vals)/len(z_vals)
-						new_tiles[i][j] = avg_state + rnd_var
+		for i in xrange(0, self.cols, 1):
+			for j in xrange(0, self.rows, 1):					
+				neighbors = self.get_neighbor_tiles( (i, j) )
+				z_vals = []
+				for n in neighbors:
+					if ( 0 < n[0] < self.cols ) and ( 0 < n[1] < self.rows ):
+						z_vals.append( self.tiles[n[0]][n[1]] )
+				rnd_var = random.randint(-1*int(MAX_HEIGHT*NOISE_SCALE), int(MAX_HEIGHT*NOISE_SCALE) )												
+				if evolve_mode == 'mode':								
+					mode_state = mode(z_vals)
+					new_tiles[i][j] = mode_state + rnd_var
+				elif evolve_mode == 'average':
+					avg_state = sum(z_vals)/len(z_vals)
+					new_tiles[i][j] = avg_state + rnd_var
 
 		self.tiles = new_tiles
 		self.draw_current_state()
-
-
-		
-	def draw_grid_refined(self):
-		""" draw new grid in finer detail than parent """
-		# init the scaled grid
-		grid_scale = 4
-		self.tile_size = self.tile_size/grid_scale
-		self.cols = int(self.map_width/self.tile_size)
-		self.rows = int(self.map_height/self.tile_size)
-		new_tiles = [[0 for x in xrange(0, self.rows, 1)] for x in xrange(0, self.cols, 1)] 
-
-		for i in xrange(0, self.cols-1, 1):
-			for j in xrange(0, self.rows-1, 1):
-				#if on border of world, make water				
-				parent_tile_x = int(i/grid_scale)
-				parent_tile_y = int(j/grid_scale)
-					
-				if i == 0 or i == self.cols or j == 0 or j == self.rows:
-					new_tiles[i][j] = 0				
-				else:					
-					neighbors = self.get_neighbor_tiles( (parent_tile_x,parent_tile_y) )
-					# print self.cols, self.rows, self.tile_size, i,j, parent_tile_x, parent_tile_y
-					# pprint.pprint(neighbors)
-					try:
-						# value of new small tile is avg of parents' neighbors +- random variance
-						rnd_key = random.randint(0,100)									
-						if rnd_key < 70:
-							rnd_val = random.randint( 0, MAX_HEIGHT*NOISE_SCALE )									
-						else:
-							rnd_val = 0
-						z_vals = [self.tiles[n[0]][n[1]] for n in neighbors]
-						avg_state = sum(z_vals)/len(z_vals)										
-						new_tiles[i][j] = clamp(avg_state+rnd_val, 0, MAX_HEIGHT)						
-					except Exception, e:
-						# print 'fail', e
-						pass
-			
-		#  update screen
-		self.tiles = new_tiles
-		self.draw_current_state()
-
 
 
 	def get_neighbor_tiles(self, tile):
@@ -226,15 +208,37 @@ class TCApp:
 				if i==0 and j==0:
 					pass # do nothing, it's the center tile					
 				else:	
-					new_x = clamp(x_pos + i, 0, self.cols)
-					new_y = clamp(y_pos + j, 0, self.rows)					
+					new_x = (x_pos + i) % self.cols
+					new_y = (y_pos + j) % self.rows
+					# print "neighbor:", i, j, x_pos, y_pos, new_x, new_y					
 					neighbors.append( (new_x, new_y) )					
 		return neighbors
+
+
+	def reset_tile_size(self):
+		self.tile_size = TILE_SIZE
 
 
 	def calc_grayscale(self, z_val):
 		g_val = clamp(z_val * (255/MAX_HEIGHT), 0, 255)
 		return (g_val,g_val,g_val)
+
+
+	def calc_hsb(self, z_val):
+		h = 0.0
+		s = 0.0
+		if z_val < WATER_TABLE_LEVEL*MAX_HEIGHT: 
+			h = 0.3
+			s = 0.5
+		else:
+			h = 1.0
+			s = 1.0			
+		b = random.randint(0,100)*.01
+		
+		print 'hsb:', h,s,b
+		print 'rgb:', colorsys.hsv_to_rgb(h,s,b)
+		# print ''
+		return colorsys.hsv_to_rgb( h,s,b )
 
 
 	def calc_color(self, z_val):
