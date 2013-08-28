@@ -45,6 +45,7 @@ class TCApp:
 		# init screen
 		self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))	
 		pygame.display.set_caption("Press Enter to reset, Esc to quit")
+
 		self.draw_window()
 
 		# init map
@@ -53,6 +54,10 @@ class TCApp:
 		#wait for events in game loop
 		self.loop()
 
+
+
+	def reset_tile_size(self):
+		self.tile_size = TILE_SIZE
 
 
 	def generate_map(self):
@@ -67,7 +72,11 @@ class TCApp:
 		
 		# smooth via avg
 		self.evolve_state(evolve_mode=2)
-		
+
+		# refine it
+		self.draw_grid_refined()
+				
+		self.evolve_state(evolve_mode=2)
 
 
 	def loop(self):
@@ -81,9 +90,10 @@ class TCApp:
 				running = 0
 			
 			if keys[pygame.K_RETURN]:
+				self.reset_tile_size()
 				self.generate_map()
 				time.sleep (50.0 / 1000.0)
-				
+			
 			if keys[pygame.K_ESCAPE]:
 				sys.exit()	
 		
@@ -138,28 +148,73 @@ class TCApp:
 
 
 	def evolve_state(self, evolve_mode):
-		""" smooth map via averaging or mode """
+		""" smooth map via averaging or mode 
+			1 is mode, 2 is average """
 		new_tiles = [[0 for x in xrange(0, self.rows, 1)] for x in xrange(0, self.cols, 1)] 
-		for i in xrange(0, self.cols, 1):
-			for j in xrange(0, self.rows, 1):
+		for i in xrange(0, self.cols-1, 1):
+			for j in xrange(0, self.rows-1, 1):
 				# if on map border, make ocean
-				if i == 0 or i == self.cols-1 or j == 0 or j == self.rows-1:
+				if i == 0 or i == self.cols or j == 0 or j == self.rows:
 					new_tiles[i][j] = 0
 				else:
 					state = self.tiles[i][j]
 					neighbors = self.get_neighbor_tiles( (i, j) )
 					z_vals = [self.tiles[n[0]][n[1]] for n in neighbors]
-					avg_state = sum(z_vals)/len(z_vals)
-					mode_state = mode(z_vals)
-					rnd_var = random.randint(0,1)		
-
+					
 					if evolve_mode == 1:								
+						mode_state = mode(z_vals)
+						rnd_var = random.randint(0,1)							
 						new_tiles[i][j] = mode_state + rnd_var
 					else:
+						avg_state = sum(z_vals)/len(z_vals)
 						new_tiles[i][j] = avg_state
 
 		self.tiles = new_tiles
 		self.draw_current_state()
+
+
+		
+	def draw_grid_refined(self):
+		""" draw new grid in finer detail than parent """
+		# init the scaled grid
+		grid_scale = 4
+		self.tile_size = self.tile_size/grid_scale
+		self.cols = int(self.map_width/self.tile_size)
+		self.rows = int(self.map_height/self.tile_size)
+		new_tiles = [[0 for x in xrange(0, self.rows, 1)] for x in xrange(0, self.cols, 1)] 
+
+		for i in xrange(0, self.cols-1, 1):
+			for j in xrange(0, self.rows-1, 1):
+				#if on border of world, make water				
+				parent_tile_x = int(i/grid_scale)
+				parent_tile_y = int(j/grid_scale)
+					
+				if i == 0 or i == self.cols or j == 0 or j == self.rows:
+					new_tiles[i][j] = 0				
+				else:					
+					neighbors = self.get_neighbor_tiles( (parent_tile_x,parent_tile_y) )
+					# print self.cols, self.rows, self.tile_size, i,j, parent_tile_x, parent_tile_y
+					# pprint.pprint(neighbors)
+					try:
+						# value of new small tile is avg of parents' neighbors +- random variance
+						rnd_key = random.randint(0,100)									
+						if rnd_key > 70:
+							rnd_val = random.randint(-2,2)									
+						else:
+							rnd_val = 0
+						z_vals = [self.tiles[n[0]][n[1]] for n in neighbors]
+						avg_state = sum(z_vals)/len(z_vals)										
+						new_tiles[i][j] = clamp(avg_state+rnd_val, 0, MAX_HEIGHT)
+						color_val = self.calc_color( new_tiles[i][j] )
+						pygame.draw.rect(self.screen, color_val, ((i*self.tile_size), (j*self.tile_size), self.tile_size, self.tile_size), 0)																	
+					except Exception, e:
+						# print 'fail', e
+						pass
+			
+		#  update screen
+		self.tiles = new_tiles
+		self.draw_current_state()
+
 
 
 	def get_neighbor_tiles(self, tile):
@@ -173,8 +228,8 @@ class TCApp:
 					pass # do nothing, it's the center tile					
 				else:	
 					new_x = clamp(x_pos + i, 0, self.cols)
-					new_y = clamp(y_pos + j, 0, self.rows)
-					neighbors.append( (new_x, new_y) ) #top_left						
+					new_y = clamp(y_pos + j, 0, self.rows)					
+					neighbors.append( (new_x, new_y) )					
 		return neighbors
 
 
