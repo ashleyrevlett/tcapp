@@ -70,14 +70,13 @@ class TCApp:
 		else:
 			self.evolve_state(evolve_mode=1)
 		
-		# smooth via avg
 		self.evolve_state(evolve_mode=2)
-
-		# refine it
+		self.evolve_state(evolve_mode=1)
+		
 		self.draw_grid_refined()
 				
+		self.evolve_state(evolve_mode=1)
 		self.evolve_state(evolve_mode=2)
-
 
 	def loop(self):
 		# infinite loop
@@ -120,7 +119,7 @@ class TCApp:
 				if i == 0 or i == self.cols-1 or j == 0 or j == self.rows-1:
 					self.tiles[i][j] = 0				
 				else:
-					rnd_key = random.randint(0,10)					
+					rnd_key = random.randint(0,MAX_HEIGHT)					
 					self.tiles[i][j] = rnd_key
 
 		# now that random grid data is set up, draw the recs
@@ -133,7 +132,7 @@ class TCApp:
 		offset_y = 0
 		for i in xrange(0, self.cols, 1):
 			for j in xrange(0, self.rows, 1):
-				color_val = self.calc_color( self.tiles[i][j] )
+				color_val = self.calc_grayscale( self.tiles[i][j] )
 				pygame.draw.rect(self.screen, color_val, ((i*self.tile_size)+offset_x, (j*self.tile_size)+offset_y, self.tile_size, self.tile_size), 0)									
 				
 				if TESTING == True:
@@ -143,6 +142,8 @@ class TCApp:
 					label = self.base_font.render(label_text, 1, PINK)
 					label_rect = pygame.Rect( (self.tile_size*i+offset_x+1,self.tile_size*j+offset_y+1), (self.tile_size+10,self.tile_size+10))
 					self.screen.blit(label,label_rect)
+		
+		time.sleep (50.0 / 1000.0)
 
 		pygame.display.flip()
 
@@ -160,14 +161,14 @@ class TCApp:
 					state = self.tiles[i][j]
 					neighbors = self.get_neighbor_tiles( (i, j) )
 					z_vals = [self.tiles[n[0]][n[1]] for n in neighbors]
-					
+					# rnd_var = random.randint(0, (MAX_HEIGHT*NOISE_SCALE) )												
+					rnd_var = 0
 					if evolve_mode == 1:								
 						mode_state = mode(z_vals)
-						rnd_var = random.randint(0,1)							
 						new_tiles[i][j] = mode_state + rnd_var
 					else:
 						avg_state = sum(z_vals)/len(z_vals)
-						new_tiles[i][j] = avg_state
+						new_tiles[i][j] = avg_state + rnd_var
 
 		self.tiles = new_tiles
 		self.draw_current_state()
@@ -198,15 +199,13 @@ class TCApp:
 					try:
 						# value of new small tile is avg of parents' neighbors +- random variance
 						rnd_key = random.randint(0,100)									
-						if rnd_key > 70:
-							rnd_val = random.randint(-2,2)									
+						if rnd_key < 70:
+							rnd_val = random.randint( 0, MAX_HEIGHT*NOISE_SCALE )									
 						else:
 							rnd_val = 0
 						z_vals = [self.tiles[n[0]][n[1]] for n in neighbors]
 						avg_state = sum(z_vals)/len(z_vals)										
-						new_tiles[i][j] = clamp(avg_state+rnd_val, 0, MAX_HEIGHT)
-						color_val = self.calc_color( new_tiles[i][j] )
-						pygame.draw.rect(self.screen, color_val, ((i*self.tile_size), (j*self.tile_size), self.tile_size, self.tile_size), 0)																	
+						new_tiles[i][j] = clamp(avg_state+rnd_val, 0, MAX_HEIGHT)						
 					except Exception, e:
 						# print 'fail', e
 						pass
@@ -231,6 +230,11 @@ class TCApp:
 					new_y = clamp(y_pos + j, 0, self.rows)					
 					neighbors.append( (new_x, new_y) )					
 		return neighbors
+
+
+	def calc_grayscale(self, z_val):
+		g_val = clamp(z_val * (255/MAX_HEIGHT), 0, 255)
+		return (g_val,g_val,g_val)
 
 
 	def calc_color(self, z_val):
