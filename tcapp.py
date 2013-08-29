@@ -90,16 +90,15 @@ class TCApp:
 		self.draw_grid()
 
 		# magic formula
-		self.evolve_state(evolve_mode='mode')
-		self.evolve_state(evolve_mode='mode')					
-		self.evolve_state(evolve_mode='average')	
-			
-		self.draw_grid_refined()	
-
-		self.evolve_state(evolve_mode='mode')					
-		self.evolve_state(evolve_mode='average')	
-
-
+		self.evolve_state(evolve_mode='mode')		
+		self.evolve_state(evolve_mode='mode')				
+		self.evolve_state(evolve_mode='mode')				
+		# self.evolve_state(evolve_mode='average')									
+		self.draw_grid_refined(grid_scale = 2)							
+		self.draw_grid_refined(grid_scale = 2)							
+		self.draw_grid_refined(grid_scale = 2)	
+		
+		
 	def draw_grid(self):
 		""" initialize grid structure to random noise """
 		# init the grid
@@ -115,10 +114,9 @@ class TCApp:
 		self.draw_current_state()
 
 
-	def draw_grid_refined(self):
+	def draw_grid_refined(self, grid_scale=4):
 		""" draw new grid in finer detail than parent """
 		# init the scaled grid
-		grid_scale = 4
 		tile_size_sm = self.tile_size/grid_scale
 		cols_sm = int(self.map_width/tile_size_sm)
 		rows_sm = int(self.map_height/tile_size_sm)
@@ -158,8 +156,8 @@ class TCApp:
 		offset_y = 0
 		for i in xrange(0, self.cols, 1):
 			for j in xrange(0, self.rows, 1):
-				color_val = self.calc_grayscale( self.tiles[i][j] )
-				# color_val = self.calc_hsb( self.tiles[i][j] )
+				# color_val = self.calc_grayscale( self.tiles[i][j] )
+				color_val = self.calc_hsv(self.tiles[i][j])
 				# color_val = self.calc_color( self.tiles[i][j] )
 				pygame.draw.rect(self.screen, color_val, ((i*self.tile_size)+offset_x, (j*self.tile_size)+offset_y, self.tile_size, self.tile_size), 0)									
 				
@@ -224,22 +222,30 @@ class TCApp:
 		return (g_val,g_val,g_val)
 
 
-	def calc_hsb(self, z_val):
-		h = 0.0
-		s = 0.0
-		if z_val < WATER_TABLE_LEVEL*MAX_HEIGHT: 
-			h = 0.3
-			s = 0.5
+	def calc_hsv(self, z_val):
+		rgb_scale = 255.0/MAX_HEIGHT
+		hsv_scale = 100.0/MAX_HEIGHT
+		z_val_rgb = clamp( int(z_val * rgb_scale), 0, 255 )
+		z_val_hsv = clamp( int(z_val * hsv_scale), 0, 100 )
+		# print z_val, rgb_scale, hsv_scale, z_val_rgb, z_val_hsv
+		color = pygame.Color(z_val_rgb, z_val_rgb, z_val_rgb, 100) # Have to create a Color object using RGBA, then change its color
+		# color.hsva = (30,30,30,100)
+		# HSVA: Hue, Saturation, Value, Alpha (transparency).               
+		# find out how Hue values (0-359) correspond to colors;
+		# saturation is the intensity of the color, from gray to
+		# bright (0-100); value runs from dark to light (0-100).
+		if z_val <= WATER_TABLE_LEVEL*MAX_HEIGHT: 
+			z_val_hsv = clamp(z_val_hsv+10, 0, 100)
+			color.hsva = (200, 60, z_val_hsv, 100)
+		elif WATER_TABLE_LEVEL*MAX_HEIGHT < z_val <= BEACH_END*MAX_HEIGHT:
+			z_val_hsv = clamp(z_val_hsv+15, 0, 100)			
+			color.hsva = (52, 10, z_val_hsv, 100)
+		elif z_val > TREE_LINE*MAX_HEIGHT:	
+			color.hsva = (0, 0, z_val_hsv, 100)			
 		else:
-			h = 1.0
-			s = 1.0			
-		b = random.randint(0,100)*.01
-		
-		print 'hsb:', h,s,b
-		print 'rgb:', colorsys.hsv_to_rgb(h,s,b)
-		# print ''
-		return colorsys.hsv_to_rgb( h,s,b )
-
+			z_val_hsv = clamp(z_val_hsv-15, 0, 100)			
+			color.hsva = (137, 60, z_val_hsv, 100)
+		return color
 
 	def calc_color(self, z_val):
 		""" accepts z value (int), returns color constant in RGB form """
