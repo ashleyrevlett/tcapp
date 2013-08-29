@@ -43,7 +43,7 @@ class TCApp:
 
 		# init screen
 		self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))	
-		pygame.display.set_caption("Enter: New | 1: Evolve (Mode) | 2: Evolve (Avg) | Esc: Exit")
+		pygame.display.set_caption("Enter: New | 1: Evolve (Mode) | 2: Evolve (Avg) | 3: Erode | Esc: Exit")
 
 		self.create_window()
 
@@ -71,7 +71,8 @@ class TCApp:
 				self.evolve_state(evolve_mode='mode')					
 			if keys[pygame.K_2]:
 				self.evolve_state(evolve_mode='average')					
-	
+			if keys[pygame.K_3]:
+				self.erode(coverage=0.5, strength=0.1)
 		
 
 	def create_window(self):		
@@ -90,15 +91,23 @@ class TCApp:
 		self.draw_grid()
 
 		# magic formula
+
 		self.evolve_state(evolve_mode='mode')		
 		self.evolve_state(evolve_mode='mode')				
 		self.evolve_state(evolve_mode='mode')				
-		# self.evolve_state(evolve_mode='average')									
-		self.draw_grid_refined(grid_scale = 2)							
-		self.draw_grid_refined(grid_scale = 2)							
-		self.draw_grid_refined(grid_scale = 2)	
+		self.evolve_state(evolve_mode='mode')				
+		self.evolve_state(evolve_mode='mode')				
+
+		# self.erode(coverage=0.5, strength=0.1)		
+
+		self.draw_grid_refined(grid_scale=2)							
 		
-		
+		# self.evolve_state(evolve_mode='mode')				
+		# self.evolve_state(evolve_mode='average')	
+
+		self.draw_grid_refined(grid_scale=2)		
+		self.draw_grid_refined(grid_scale=2)
+
 	def draw_grid(self):
 		""" initialize grid structure to random noise """
 		# init the grid
@@ -121,9 +130,6 @@ class TCApp:
 		cols_sm = int(self.map_width/tile_size_sm)
 		rows_sm = int(self.map_height/tile_size_sm)
 		new_tiles = [[0 for x in xrange(0, rows_sm, 1)] for x in xrange(0, cols_sm, 1)] 
-	
-		# print "Cols: %d. Rows: %d. Tile Size: %d" % (self.cols, self.rows, self.tile_size)
-		# print "SmCols: %d. SmRows: %d. Sm Tile Size: %d" % (cols_sm, rows_sm, tile_size_sm)
 
 		for i in xrange(0, cols_sm, 1):
 			for j in xrange(0, rows_sm, 1):
@@ -146,6 +152,8 @@ class TCApp:
 		self.rows = rows_sm		
 		self.tile_size = tile_size_sm		
 		self.tiles = new_tiles
+
+		print "Cols: %d. Rows: %d. Tile Size: %d" % (self.cols, self.rows, self.tile_size)
 
 		self.draw_current_state()
 
@@ -195,6 +203,24 @@ class TCApp:
 		self.tiles = new_tiles
 		self.draw_current_state()
 
+
+	def erode(self, coverage=0.5, strength=0.1):
+		""" coverage, strength: float 0-1 """
+		tile_total = int((self.cols * self.rows) * coverage)
+		for tile in xrange(0,tile_total):
+			rnd_tile_x = random.randint(0, self.cols-1)
+			rnd_tile_y = random.randint(0, self.rows-1)
+			rnd_var_max = MAX_HEIGHT * strength
+			rnd_var_max = random.randint(0, int(rnd_var_max))
+			# print rnd_tile_x, rnd_tile_y, self.tiles[rnd_tile_x][rnd_tile_y], rnd_var_max
+			new_z = ''
+			if rnd_var_max % 2 == 0:
+				new_z = clamp(self.tiles[rnd_tile_x][rnd_tile_y]-rnd_var_max, 0, MAX_HEIGHT)
+			else: 
+				new_z = clamp(self.tiles[rnd_tile_x][rnd_tile_y]+rnd_var_max, 0, MAX_HEIGHT)
+			self.tiles[rnd_tile_x][rnd_tile_y] = new_z
+		
+		self.draw_current_state()
 
 	def get_neighbor_tiles(self, tile):
 		""" accepts tuple of tile coords; returns array of tile coord tuples """
